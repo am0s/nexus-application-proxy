@@ -1,4 +1,5 @@
 FROM ubuntu:14.04
+MAINTAINER Jan Borsodi <jborsodi@gmail.com>
 
 RUN apt-get update
 RUN apt-get install -y wget make gcc binutils python-pip python-dev libssl-dev libffi-dev bash
