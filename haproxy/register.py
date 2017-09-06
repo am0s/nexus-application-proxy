@@ -351,17 +351,26 @@ def register_vhost(args=None):
     elif listener_port == 'https':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)
         remove_listener(client, alb=alb_identifier, identifier='https-' + main_domain)
-        rules = []
+        https_rules = []
+        http_rules = []
         for domain in listener_domains:
             domain, path = (domain.split('/', 1) + [None])[0:2]
-            rules.append({
+            https_rules.append({
                 'id': 'vhost-' + domain,
                 'host': domain,
                 'path': path,
                 'action': 'tg:' + tg_id,
             })
+            http_rules.append({
+                'id': 'vhost-https-' + domain,
+                'host': domain,
+                'path': path,
+                'action': 'https',
+            })
         register_listener(client, alb=alb_identifier, identifier='https-' + main_domain, name='HTTPS 443', port=443,
-                          protocol='https', rules=rules)
+                          protocol='https', rules=https_rules)
+        register_listener(client, alb=alb_identifier, identifier='http-' + main_domain, name='HTTP 80', port=80,
+                          protocol='http', rules=http_rules)
         # TODO: Add a rule which upgrades http to https
     elif listener_port == 'mixed':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)

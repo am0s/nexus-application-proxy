@@ -72,7 +72,13 @@ class Rule(object):
         self.target_group = target_group
         self.target_group_id = None
         if action and action.startswith("tg:"):
+            self.action_type = "forward"
             self.target_group_id = action[3:]
+        elif action == 'https':
+            self.action_type = "https"
+        elif action and action.startswith("status:"):
+            self.action_type = "status"
+            self.status_code = action[7:]
 
     def __eq__(self, other: "Rule"):
         return self.path == other.path and self.host == other.host and self.action == other.action
