@@ -34,26 +34,26 @@ def cli_run_alb(args=None):
         verbosity = args.verbosity
     alb_id = os.environ.get('ALB_ID', args.alb_id)
     if verbosity >= 1:
-        print("Initializing ALB with identifier: ", alb_id)
+        logger.info("Initializing ALB with identifier: %s", alb_id)
 
     current_listeners_map = {}
     no_services_timeout = NO_SERVICES_TIMEOUT
     config_mtime = None
     if verbosity >= 0:
-        print("Polling configuration from etcd")
+        logger.info("Polling configuration from etcd")
     while True:
         try:
             alb_config = get_alb(alb_id)
 
             new_config_mtime = int(os.path.getmtime(HAPROXY_TEMPLATE))
             if verbosity >= 3:
-                print("Config new mtime: ", new_config_mtime, ", old mtime: ", config_mtime)
+                logger.debug("Config new mtime: %s, old mtime: %s", new_config_mtime, config_mtime)
             if new_config_mtime == config_mtime and alb_config.listeners_map == current_listeners_map:
                 time.sleep(POLL_TIMEOUT)
                 continue
 
             if verbosity >= 1:
-                print("Config changed. reload haproxy")
+                logger.debug("Config changed. reload haproxy")
             # Write to a new config file and verify it
             write_config(alb_config, filename="/etc/haproxy.new.cfg")
             config_mtime = int(os.path.getmtime(HAPROXY_TEMPLATE))
@@ -75,21 +75,21 @@ def cli_run_alb(args=None):
 
         except NoListeners:
             if verbosity >= 1:
-                print("No services, waiting")
+                logger.info("No services, waiting")
             time.sleep(no_services_timeout)
             pass
         except ConfigurationError as e:
             if verbosity >= 0:
-                print("Etcd host is not defined: ", e, file=sys.stderr)
+                logger.error("Etcd host is not defined: %s", e)
             sys.exit(1)
         except jinja2.exceptions.TemplateError as e:
             if verbosity >= 0:
-                print("Error while rendering jinja2 template: ", e, file=sys.stderr)
+                logger.error("Error while rendering jinja2 template: %s", e)
             time.sleep(no_services_timeout)
             pass
         except Exception as e:
             if verbosity >= 0:
-                print("Error:", e, file=sys.stderr)
+                logger.exception("Unknown error")
             raise
 
         time.sleep(POLL_TIMEOUT)
@@ -156,7 +156,7 @@ def cli_show_config(args=None):
         sys.exit(1)
     except Exception as e:
         if verbosity >= 0:
-            print("Error:", e, file=sys.stderr)
+            print("Unknown error:", e, file=sys.stderr)
         sys.exit(1)
 
 

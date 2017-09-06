@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 import argparse
+import logging
 import socket
 import sys
 import os
 import etcd
 import json
+
+
+logger = logging.getLogger('docker-alb')
 
 
 def load_config():
@@ -200,7 +204,7 @@ def auto_register_docker(args=None):
     etcd_host = os.environ.get("ETCD_HOST", args.etcd_host)
     backend_host = os.environ.get("HOST_IP")
     if not etcd_host:
-        print("ETCD_HOST not set", file=sys.stderr)
+        logger.error("ETCD_HOST not set")
         sys.exit(1)
 
     port = 4001

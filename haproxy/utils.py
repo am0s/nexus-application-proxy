@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
-
 import json
 import os
-import sys
 
 POLL_TIMEOUT = 5
 NO_SERVICES_TIMEOUT = 5.0
