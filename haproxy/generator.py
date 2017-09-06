@@ -26,9 +26,16 @@ def create_context():
     }
 
 
-def write_config(alb_config: LoadBalancerConfig, template_filename=None):
+def write_config(alb_config: LoadBalancerConfig, template_filename=None, filename=None):
+    """
+    Writes load balancer configuration to a haproxy config file.
+
+    :param alb_config: Load balancer configuration object
+    :param template_filename: Filename to load template from or None to use default.
+    :param filename: Filename to write to or None to use default haproxy config
+    """
     template = env.from_string(open(template_filename or HAPROXY_TEMPLATE).read())
-    with open("/etc/haproxy.cfg", "w") as f:
+    with open(filename or "/etc/haproxy.cfg", "w") as f:
         context = create_context()
         context.update({
             'listeners': alb_config.listeners,
@@ -37,7 +44,14 @@ def write_config(alb_config: LoadBalancerConfig, template_filename=None):
         f.write(template.render(context))
 
 
-def generate_config(alb_config: LoadBalancerConfig, template_filename=None):
+def generate_config(alb_config: LoadBalancerConfig, template_filename=None) -> str:
+    """
+    Generates haproxy config from load balancer configuration and returns it.
+
+    :param alb_config: Load balancer configuration object
+    :param template_filename: Filename to load template from or None to use default.
+    :return: The haproxy config as a string
+    """
     template = env.from_string(open(template_filename or HAPROXY_TEMPLATE).read())
     context = create_context()
     context.update({

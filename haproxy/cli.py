@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+import logging
 import os
+import subprocess
 import sys
 import time
 from subprocess import call
@@ -11,6 +13,8 @@ from .generator import write_config, generate_config, HAPROXY_TEMPLATE
 from .services import NoListeners, NoTargetGroups
 from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
 from .manager import get_alb
+
+logger = logging.getLogger('docker-alb')
 
 
 def cli_run_alb(args=None):
@@ -50,12 +54,21 @@ def cli_run_alb(args=None):
 
             if verbosity >= 1:
                 print("Config changed. reload haproxy")
-            write_config(alb_config)
+            # Write to a new config file and verify it
+            write_config(alb_config, filename="/etc/haproxy.new.cfg")
             config_mtime = int(os.path.getmtime(HAPROXY_TEMPLATE))
-            ret = call("./reload-haproxy.sh")
+            ret = call("./configtest-haproxy.sh /etc/haproxy.new.cfg", shell=True, stdout=subprocess.DEVNULL)
             if ret != 0:
-                if verbosity >= 1:
-                    print("Reloading haproxy returned non-zero value: ", ret, file=sys.stderr)
+                logger.error(
+                    "haproxy configuration is not valid, keeping old config, see /etc/haproxy.new.cfg for details")
+                time.sleep(POLL_TIMEOUT)
+                continue
+
+            if verbosity >= 2:
+                logger.error("Reloading haproxy")
+            ret = call("./reload-haproxy.sh", shell=True)
+            if ret != 0:
+                logger.error("Reloading haproxy returned non-zero value: %s", ret)
                 time.sleep(POLL_TIMEOUT)
                 continue
             current_listeners_map = alb_config.listeners_map.copy()
