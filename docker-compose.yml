@@ -1,0 +1,61 @@
+# Development setup which sets up etcd, loadbalancer and discover service
+version: '2.1'
+volumes:
+  etcd_data: {}
+
+services:
+  loadbalancer:
+    build:
+      context: .
+      dockerfile: compose/loadbalancer/Dockerfile
+    volumes:
+      - ./:/app
+    environment:
+      - ETCD_HOST=etcd:2379
+      - VERBOSITY_LEVEL=2
+      - LOG_SIDECAR=true
+    env_file:
+      - .env
+    ports:
+      - ${WEB_PORT}:80
+      - ${STAT_PORT-1936}:1936
+    depends_on:
+      - etcd
+    links:
+      - etcd
+    volumes_from:
+      - syslog-sidecar
+
+  autodiscover:
+    build:
+      context: .
+      dockerfile: compose/autodiscover/Dockerfile
+    volumes:
+      - ./:/app
+      # Uncomment to allow docker to be used inside container (no Windows support yet)
+#      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - ETCD_HOST=etcd:2379
+    env_file:
+      - .env
+    depends_on:
+      - etcd
+    links:
+      - etcd
+    # Don't run anything yet
+    command: /bin/true
+
+  etcd:
+    image: quay.io/coreos/etcd
+    command: etcd -name etcd0 -advertise-client-urls http://:2379,http://:4001 -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001 -listen-peer-urls http://0.0.0.0:2380 --data-dir=/etcd-data
+    volumes:
+      - etcd_data:/etcd-data
+    env_file:
+      - .env
+    ports:
+      - ${ETCD_PORT-2379}:2379
+
+  # Start a syslog sidecar which haproxy can log to
+  # This is needed as haproxy cannot log to stdout and then be managed by docker
+  syslog-sidecar:
+    image: outstand/syslog-ng-stdout:latest

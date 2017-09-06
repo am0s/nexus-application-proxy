@@ -3,6 +3,7 @@ MAINTAINER Jan Borsodi <jborsodi@gmail.com>
 
 RUN apt-get update
 RUN apt-get install -y wget python3 python3-pip python3-dev libssl-dev libffi-dev bash
+RUN pip3 install Jinja2
 
 RUN mkdir /app
 WORKDIR /app

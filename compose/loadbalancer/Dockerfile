@@ -3,6 +3,7 @@ MAINTAINER Jan Borsodi <jborsodi@gmail.com>
 
 RUN apt-get update
 RUN apt-get install -y wget make gcc binutils python-pip python-dev libssl-dev libffi-dev bash
+RUN apt-get install -y wget python3 python3-pip python3-dev
 
 WORKDIR /root
 
@@ -11,7 +12,7 @@ RUN wget http://www.haproxy.org/download/1.5/src/haproxy-1.5.1.tar.gz && \
 
 RUN cd haproxy-1.5.1 && make TARGET=generic && make install
 
-RUN pip install python-etcd Jinja2
+RUN pip3 install python-etcd Jinja2
 RUN touch /var/run/haproxy.pid
 
 RUN apt-get update && apt-get install rsyslog -y && \
@@ -26,4 +27,4 @@ WORKDIR /app
 
 EXPOSE 1936 80
 
-CMD ["python", "main.py"]
+CMD ["python3", "main.py"]

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+    #!/usr/bin/python
 
 {{ $CurrentContainer := where $ "ID" .Docker.CurrentContainerID | first }}
 
@@ -26,20 +26,43 @@
         {
             "name": "{{ .Container.Name }}",
             "host": "{{ .Network.IP }}",
-            "port": None, "down": True,
+            "port": None,
+            "down": True,
         },
     {{ end }}
 {{ end }}
 
 services = [
 {{ range $container := whereLabelExists $ "com.proxy.virtual_host" }}
-    {{ $domains := split (index $container.Labels "com.proxy.virtual_host") "," }}
-    {{ $host_group := coalesce (index $container.Labels "com.proxy.virtual_group") (first $domains ) }}
+    {{ $domains := split ($container.Env.VIRTUAL_HOST) "," }}
+    {{ $host_group := coalesce ($container.Env.TARGET_GROUP) (first $domains ) }}
+    {{ $port_mode := coalesce ($container.Env.VIRTUAL_PORT) "https" }}
+    {{ $cert := coalesce ($container.Env.CERTIFICATE) "letsencrypt" }}
+    {{ $health_path := coalesce ($container.Env.HEALTHCHECK_PATH) "/" }}
+    {{ $health_port := coalesce ($container.Env.HEALTHCHECK_PORT) "traffic" }}
+    {{ $health_healthy := coalesce ($container.Env.HEALTHCHECK_HEALTHY) 2 }}
+    {{ $health_unhealthy := coalesce ($container.Env.HEALTHCHECK_UNHEALTHY) 10 }}
+    {{ $health_timeout := coalesce ($container.Env.HEALTHCHECK_TIMEOUT) 4 }}
+    {{ $health_interval := coalesce ($container.Env.HEALTHCHECK_INTERVAL) 5 }}
+    {{ $health_success_list := split (coalesce ($container.Env.HEALTHCHECK_SUCCESS) "200") "," }}
     {
+        "id": "vhost-{{ $host_group }}",
         "name": "{{ $host_group }}",
-        "hosts": [{{ range $domain := $domains }}"{{ $domain }}",{{ end }}],
-        "ports": [80],
-        "backends": [
+        "mode": "vhost",
+        "domains": [{{range $domain:= $domains}}"{{ $domain }}", {{end}}],
+        "port_mode": "{{ $port_mode }}",
+        "cert": "{{ $cert }}",
+        "health": {
+            "protocol": "http",
+            "path": "{{ $health_path }}",
+            "port": "{{ $health_port }}",
+            "healthy": {{ $health_healthy }},
+            "unhealthy": {{ $health_unhealthy }},
+            "timeout": {{ $health_timeout }},
+            "interval": {{ $health_interval }},
+            "success": [{{range $health_success := $health_success_list }}"{{ $health_success }}", {{end}}],
+        },
+        "targets": [
     {{ $addrLen := len $container.Addresses }}
 
     {{ range $knownNetwork := $CurrentContainer.Networks }}

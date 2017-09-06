@@ -5,7 +5,6 @@ import json
 import os
 import sys
 
-
 POLL_TIMEOUT = 5
 NO_SERVICES_TIMEOUT = 5.0
 

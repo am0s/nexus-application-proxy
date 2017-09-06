@@ -5,8 +5,8 @@ import argparse
 import sys
 import json
 
-from haproxy.manager import get_services
-from haproxy.services import NoServices
+from haproxy.manager import get_listeners
+from haproxy.services import NoListeners
 from haproxy.utils import ConfigurationError
 
 
@@ -18,13 +18,13 @@ def main(args=None):
     verbosity = args.verbosity
 
     try:
-        service_config = get_services()
+        service_config = get_listeners()
         print(json.dumps(service_config, ensure_ascii=False, indent=4))
     except ConfigurationError as e:
         if verbosity >= 0:
             print("Etcd host is not defined: ", e, file=sys.stderr)
         sys.exit(1)
-    except NoServices:
+    except NoListeners:
         if verbosity >= 0:
             print("No services", file=sys.stderr)
         sys.exit(1)
