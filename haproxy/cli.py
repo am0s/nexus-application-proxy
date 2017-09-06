@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import argparse
 import os
 import sys
@@ -8,10 +8,9 @@ from subprocess import call
 import jinja2
 
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
-from .services import NoListeners
+from .services import NoListeners, NoTargetGroups
 from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
 from .manager import get_alb
-from .services import NoTargetGroups
 
 
 def cli_run_alb(args=None):
@@ -119,6 +118,19 @@ def cli_show_config(args=None):
             print("Target Groups:")
             for target_group in alb_config.target_groups:
                 print("`- {}".format(target_group.identifier))
+                if target_group.health_check:
+                    health = target_group.health_check
+                    print("  `- Health check: ")
+                    print("    `- protocol: {}".format(health.protocol))
+                    print("    `- path: {}".format(health.path))
+                    print("    `- port: {}".format(health.port))
+                    print("    `- healthy: {}".format(health.healthy))
+                    print("    `- unhealthy: {}".format(health.unhealthy))
+                    print("    `- timeout: {}".format(health.timeout))
+                    print("    `- interval: {}".format(health.interval))
+                    print("    `- success: {}".format(health.success))
+                else:
+                    print("  `- No health check")
                 for target in target_group.targets:
                     print("   `- {}:{}".format(target.host, target.port))
 

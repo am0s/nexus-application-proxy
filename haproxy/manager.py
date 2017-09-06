@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 import json
+import logging
 
 import etcd
 
-from .services import NoListeners, Listener, Rule, Target, NoTargetGroups
+from .services import NoListeners, Listener, Rule, Target, NoTargetGroups, HealthCheck
 from .utils import get_etcd_addr
 from .services import TargetGroup, LoadBalancerConfig
+
+logger = logging.getLogger('docker-alb')
 
 
 def get_listeners(alb_id, max_tries=3):
@@ -28,7 +31,7 @@ def get_target_groups(identifiers, max_tries=3):
     raise NoTargetGroups()
 
 
-def get_alb(alb_id, max_tries=3):
+def get_alb(alb_id, max_tries=3) -> LoadBalancerConfig:
     listeners = get_listeners(alb_id, max_tries=max_tries)
     target_ids = set()
     for listener in listeners.values():
@@ -56,6 +59,15 @@ def get_json(client, key, default=None):
     if value is None:
         return default
     return json.loads(value)
+
+
+def get_int_item(data, key, name):
+    value = data.get(key)
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning("Expected integer value for %s: %s", name, value)
+        return None
 
 
 def _get_listeners(alb_id):
@@ -126,6 +138,43 @@ def _get_target_groups(identifiers: list) -> dict:
         if name is None:
             continue
 
+        protocol = get_value(client, '/target_group/{name}/protocol'.format(name=group_id))
+        health_check_data = get_json(client, '/target_group/{name}/healthcheck'.format(name=group_id))
+        if health_check_data:
+            hc_protocol = health_check_data.get('protocol')
+            if hc_protocol not in ('http', ):
+                logger.warning("Unsupported protocol in healthcheck: %s", hc_protocol)
+                hc_protocol = None
+            hc_path = health_check_data.get('path')
+            if hc_path and hc_path[0] != '/':
+                logger.warning("Unsupported path in healthcheck: %s", hc_path)
+                hc_path = None
+            hc_port = health_check_data.get('port')
+            if hc_port == 'traffic':
+                pass
+            else:
+                try:
+                    hc_port = int(hc_port)
+                except ValueError:
+                    logger.warning("Unsupported port value in healthcheck: %s", hc_port)
+                    hc_port = None
+            hc_healthy = get_int_item(health_check_data, 'healthy', "healthcheck.healthy")
+            hc_unhealthy = get_int_item(health_check_data, 'unhealthy', "healthcheck.unhealthy")
+            hc_timeout = get_int_item(health_check_data, 'timeout', "healthcheck.timeout")
+            hc_interval = get_int_item(health_check_data, 'interval', "healthcheck.interval")
+            hc_success = health_check_data.get('success')
+            if hc_success:
+                if not isinstance(hc_success, list):
+                    hc_success = [hc_success]
+            else:
+                hc_success = None
+
+            health_check = HealthCheck(protocol=hc_protocol, path=hc_path, port=hc_port, healthy=hc_healthy,
+                                       unhealthy=hc_unhealthy, timeout=hc_timeout, interval=hc_interval,
+                                       success=hc_success)
+        else:
+            health_check = HealthCheck()
+
         targets_prefix = '/target_group/{name}/targets'.format(name=group_id)
         targets = []
         for i in client.read(targets_prefix).children:
@@ -146,7 +195,7 @@ def _get_target_groups(identifiers: list) -> dict:
                 port=port,
             ))
 
-        target_group = TargetGroup(group_id, targets=targets)
+        target_group = TargetGroup(group_id, targets=targets, health_check=health_check, protocol=protocol)
         groups[group_id] = target_group
 
     return groups

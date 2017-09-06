@@ -26,10 +26,16 @@ class LoadBalancerConfig(object):
 
     @property
     def listeners(self):
+        """
+        :rtype: List[Listener]
+        """
         return list(self.listeners_map.values())
 
     @property
     def target_groups(self):
+        """
+        :rtype: List[TargetGroup]
+        """
         return list(self.target_groups_map.values())
 
 
@@ -73,20 +79,66 @@ class Rule(object):
         return "Rule(host={!r},path={!r},action={!r})".format(self.host, self.path, self.action)
 
 
-class TargetGroup(object):
-    identifier = None
-    targets = []
+class HealthCheck(object):
+    protocol = 'http'
+    path = '/'
+    port = 'traffic'
+    healthy = 2
+    unhealthy = 10
+    timeout = 4
+    interval = 5
+    success = []
 
-    def __init__(self, identifier: str, targets: list = None):
-        self.identifier = identifier
-        self.targets = targets or []
+    def __init__(self, protocol: str = None, path: str = None, port: str = None, healthy: int = None,
+                 unhealthy: int = None, timeout: int = None, interval: int = None, success: list = None):
+        if protocol:
+            self.protocol = protocol
+        if path:
+            self.path = path
+        if port:
+            self.port = port
+        if healthy:
+            self.healthy = healthy
+        if unhealthy:
+            self.unhealthy = unhealthy
+        if timeout:
+            self.timeout = timeout
+        if interval:
+            self.interval = interval
+        self.success = list(success or [200])
 
-    def __eq__(self, other):
-        return self.identifier == other.identifier and self.targets == other.targets
+    def __eq__(self, other: "HealthCheck"):
+        return self.protocol == other.protocol and self.path == other.path and self.port == other.port and \
+               self.healthy == other.healthy and self.unhealthy == other.unhealthy and self.timeout == other.timeout \
+               and self.interval == other.interval and self.success == other.success
 
     def __repr__(self):
-        return "TargetGroup({!r},targets={!r})".format(
-            self.identifier, self.targets)
+        return "services.HealthCheck(protocol={!r},path={!r},port={!r},health={!r},unhealth={!r},timeout={!r}," \
+               "interval={!r},success={!r})".format(
+                self.protocol, self.path, self.port, self.healthy, self.unhealthy, self.timeout, self.interval,
+                self.success
+                )
+
+
+class TargetGroup(object):
+    identifier = None
+    protocol = 'http'
+    health_check = None
+    targets = []
+
+    def __init__(self, identifier: str, targets: list = None, protocol: str = None, health_check: HealthCheck = None):
+        self.identifier = identifier
+        self.targets = targets or []
+        self.protocol = protocol
+        self.health_check = health_check
+
+    def __eq__(self, other: "TargetGroup"):
+        return self.identifier == other.identifier and self.targets == other.targets and \
+               self.protocol == other.protocol and self.health_check == other.health_check
+
+    def __repr__(self):
+        return "TargetGroup({!r},targets={!r},protocol={!r},health_check={!r})".format(
+            self.identifier, self.targets, self.protocol, self.health_check)
 
     @property
     def slug(self):
