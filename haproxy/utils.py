@@ -10,14 +10,6 @@ class ConfigurationError(Exception):
     pass
 
 
-class JSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, object):
-            if hasattr(obj, '__json__'):
-                return [obj.real, obj.imag]
-        return super(JSONEncoder, self).default(obj)
-
-
 def get_etcd_addr():
     if "ETCD_HOST" not in os.environ:
         raise ConfigurationError("ETCD_HOST not set")
