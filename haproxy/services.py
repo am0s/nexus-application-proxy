@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 import hashlib
+import logging
+
+logger = logging.getLogger('docker-alb')
 
 
 class NoListeners(Exception):
@@ -32,6 +35,26 @@ class LoadBalancerConfig(object):
         return list(self.listeners_map.values())
 
     @property
+    def listener_groups(self):
+        """
+        :rtype: List[ListenerGroup]
+        """
+        listeners = self.listeners
+        groups = {}  # type: Dict[int, ListenerGroup]
+        for listener in listeners:
+            if listener.port not in groups:
+                groups[listener.port] = ListenerGroup('lg_' + str(listener.port), port=listener.port,
+                                                      protocol=listener.protocol, listeners=[listener])
+            else:
+                if groups[listener.port].protocol != listener.protocol:
+                    logger.error("Listener %s on port %d has protocol %s while existing listener has protocol %s",
+                                 listener.identifier, listener.port, listener.protocol,
+                                 groups[listener.port].protocol)
+                    continue
+                groups[listener.port].listeners.append(listener)
+        return list(groups.values())
+
+    @property
     def target_groups(self):
         """
         :rtype: List[TargetGroup]
@@ -62,6 +85,34 @@ class Listener(object):
         for rule in self.rules:
             if rule.target_group_id:
                 yield rule.target_group_id
+
+
+class ListenerGroup(object):
+    def __init__(self, identifier: str, port: int = None, listeners: list = None, protocol='http'):
+        """
+        Groups a set of listener with the same port, only listeners with the same protocol is added.
+
+        :param identifier: Identifier for the group.
+        :param port: The port this listener is bound to.
+        :param listeners: Listeners which belongs to this group.
+        :param protocol: The protocol used for the specified port.
+        """
+        self.identifier = identifier
+        self.port = port
+        self.listeners = list(listeners or [])
+        self.protocol = protocol
+
+    def __eq__(self, other: "ListenerGroup"):
+        return self.identifier == other.identifier and self.port == other.port and \
+               self.listeners == other.listeners and self.protocol == other.protocol
+
+    def __repr__(self):
+        return "ListenerGroup({!r},port={!r},listeners={!r},protocol={!r})".format(
+            self.identifier, self.port, self.listeners, self.protocol)
+
+    @property
+    def slug(self):
+        return self.identifier.replace(".", "_").replace("-", "_")
 
 
 class Rule(object):
