@@ -89,9 +89,10 @@ def _get_listeners(alb_id):
             except ValueError:
                 # Port is not an integer, skip listener
                 continue
+            listener_protocol = get_value(client, listener_path + '/protocol', default='http')
             # TODO: certificate
 
-            listener = Listener(listener_id, port=listener_port)
+            listener = Listener(listener_id, port=listener_port, protocol=listener_protocol)
 
             rules = []
             try:

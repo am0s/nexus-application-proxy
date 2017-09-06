@@ -40,13 +40,15 @@ class LoadBalancerConfig(object):
 
 
 class Listener(object):
-    def __init__(self, identifier: str, port: int = None, rules: list = None):
+    def __init__(self, identifier: str, port: int = None, rules: list = None, protocol='http'):
         self.identifier = identifier
         self.port = port
         self.rules = list(rules or [])
+        self.protocol = protocol
 
-    def __eq__(self, other):
-        return self.identifier == other.identifier and self.port == other.port and self.rules == other.rules
+    def __eq__(self, other: "Listener"):
+        return self.identifier == other.identifier and self.port == other.port and self.rules == other.rules and \
+               self.protocol == other.protocol
 
     def __repr__(self):
         return "Listener({!r},port={!r},rules={!r})".format(

@@ -149,12 +149,13 @@ def remove_listener(client: etcd.Client, alb, identifier):
         pass
 
 
-def register_listener(client: etcd.Client, alb, identifier, name, port, rules):
+def register_listener(client: etcd.Client, alb, identifier, name, port, protocol, rules):
     try:
         client.read("/alb/{alb}/listeners/{identifier}".format(alb=alb, identifier=identifier))
     except (etcd.EtcdKeyNotFound, KeyError):
         client.write("/alb/{alb}/listeners/{identifier}".format(alb=alb, identifier=identifier), None, dir=True)
     client.write("/alb/{alb}/listeners/{identifier}/name".format(alb=alb, identifier=identifier), name)
+    client.write("/alb/{alb}/listeners/{identifier}/protocol".format(alb=alb, identifier=identifier), protocol)
     client.write("/alb/{alb}/listeners/{identifier}/port".format(alb=alb, identifier=identifier), port)
     try:
         client.read("/alb/{alb}/listeners/{identifier}/rules".format(alb=alb, identifier=identifier))
@@ -346,7 +347,7 @@ def register_vhost(args=None):
                 'action': 'tg:' + tg_id,
             })
         register_listener(client, alb=alb_identifier, identifier='http-' + main_domain, name='HTTP 80', port=80,
-                          rules=rules)
+                          protocol='http', rules=rules)
     elif listener_port == 'https':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)
         remove_listener(client, alb=alb_identifier, identifier='https-' + main_domain)
@@ -360,7 +361,7 @@ def register_vhost(args=None):
                 'action': 'tg:' + tg_id,
             })
         register_listener(client, alb=alb_identifier, identifier='https-' + main_domain, name='HTTPS 443', port=443,
-                          rules=rules)
+                          protocol='https', rules=rules)
         # TODO: Add a rule which upgrades http to https
     elif listener_port == 'mixed':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)
@@ -375,9 +376,9 @@ def register_vhost(args=None):
                 'action': 'tg:' + tg_id,
             })
         register_listener(client, alb=alb_identifier, identifier='http-' + main_domain, name='HTTP 80', port=80,
-                          rules=rules)
+                          protocol='http', rules=rules)
         register_listener(client, alb=alb_identifier, identifier='https-' + main_domain, name='HTTPS 443', port=443,
-                          rules=rules)
+                          protocol='https', rules=rules)
     else:
         try:
             remove_listener(client, alb=alb_identifier,
