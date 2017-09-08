@@ -14,9 +14,10 @@ class NoTargetGroups(Exception):
 
 
 class LoadBalancerConfig(object):
-    def __init__(self, identifier: str, listeners: dict = None, target_groups: dict = None):
+    def __init__(self, identifier: str, listeners: dict = None, listener_groups=None, target_groups: dict = None):
         self.identifier = identifier
         self.listeners_map = listeners
+        self.listener_groups = list(listener_groups or [])
         self.target_groups_map = target_groups
 
     @property
@@ -35,16 +36,16 @@ class LoadBalancerConfig(object):
         return list(self.listeners_map.values())
 
     @property
-    def listener_groups(self):
+    def port_groups(self):
         """
-        :rtype: List[ListenerGroup]
+        :rtype: List[PortGroup]
         """
         listeners = self.listeners
-        groups = {}  # type: Dict[int, ListenerGroup]
+        groups = {}  # type: Dict[int, PortGroup]
         for listener in listeners:
             if listener.port not in groups:
-                groups[listener.port] = ListenerGroup('lg_' + str(listener.port), port=listener.port,
-                                                      protocol=listener.protocol, listeners=[listener])
+                groups[listener.port] = PortGroup('lg_' + str(listener.port), port=listener.port,
+                                                  protocol=listener.protocol, listeners=[listener])
             else:
                 if groups[listener.port].protocol != listener.protocol:
                     logger.error("Listener %s on port %d has protocol %s while existing listener has protocol %s",
@@ -87,7 +88,7 @@ class Listener(object):
                 yield rule.target_group_id
 
 
-class ListenerGroup(object):
+class PortGroup(object):
     def __init__(self, identifier: str, port: int = None, listeners: list = None, protocol='http'):
         """
         Groups a set of listener with the same port, only listeners with the same protocol is added.
@@ -101,6 +102,37 @@ class ListenerGroup(object):
         self.port = port
         self.listeners = list(listeners or [])
         self.protocol = protocol
+
+    def __eq__(self, other: "PortGroup"):
+        return self.identifier == other.identifier and self.port == other.port and \
+               self.listeners == other.listeners and self.protocol == other.protocol
+
+    def __repr__(self):
+        return "PortGroup({!r},port={!r},listeners={!r},protocol={!r})".format(
+            self.identifier, self.port, self.listeners, self.protocol)
+
+    @property
+    def slug(self):
+        return self.identifier.replace(".", "_").replace("-", "_")
+
+
+class ListenerGroup(object):
+    def __init__(self, identifier: str, listeners: list = None, domains: list = None, certificate_name: str =None,
+                 use_certbot: bool = False):
+        """
+        Groups configuration for a set of listeners and domains.
+
+        :param identifier: Identifier for the group.
+        :param listeners: Listeners which belongs to this group.
+        :param domains: List of domains registered to this group.
+        :param certificate_name: Name of certificate entry which holds the certificate file
+        :param use_certbot: If True then certificates are managed by certbot.
+        """
+        self.identifier = identifier
+        self.listeners = list(listeners or [])
+        self.domains = domains
+        self.certificate_name = certificate_name
+        self.use_certbot = use_certbot
 
     def __eq__(self, other: "ListenerGroup"):
         return self.identifier == other.identifier and self.port == other.port and \

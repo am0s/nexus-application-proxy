@@ -4,7 +4,7 @@ import logging
 
 import etcd
 
-from .services import NoListeners, Listener, Rule, Target, NoTargetGroups, HealthCheck
+from .services import NoListeners, Listener, Rule, Target, NoTargetGroups, HealthCheck, ListenerGroup
 from .utils import get_etcd_addr
 from .services import TargetGroup, LoadBalancerConfig
 
@@ -31,12 +31,28 @@ def get_target_groups(identifiers, max_tries=3):
     raise NoTargetGroups()
 
 
-def get_alb(alb_id, max_tries=3) -> LoadBalancerConfig:
+def get_listener_groups(alb_id, max_tries=3):
+    tries = 0
+    while tries < max_tries:
+        try:
+            return _get_listener_groups(alb_id)
+        except etcd.EtcdConnectionFailed:
+            tries += 1
+    raise NoTargetGroups()
+
+
+def get_alb(alb_id, with_listener_group=False, max_tries=3) -> LoadBalancerConfig:
     listeners = get_listeners(alb_id, max_tries=max_tries)
     target_ids = set()
     for listener in listeners.values():
         target_ids |= set(listener.iter_target_group_ids())
     target_groups = get_target_groups(target_ids, max_tries=max_tries)
+
+    listener_groups = None
+    if with_listener_group:
+        listener_groups = get_listener_groups(alb_id, max_tries=max_tries)
+        if listener_groups is not None:
+            listener_groups = list(listener_groups.values())
 
     # Assign TargetGroup objects to rules
     for listener in listeners.values():
@@ -44,7 +60,8 @@ def get_alb(alb_id, max_tries=3) -> LoadBalancerConfig:
             if rule.target_group_id and rule.target_group_id in target_groups:
                 rule.target_group = target_groups[rule.target_group_id]
 
-    return LoadBalancerConfig(alb_id, listeners=listeners, target_groups=target_groups)
+    return LoadBalancerConfig(alb_id, listeners=listeners, listener_groups=listener_groups,
+                              target_groups=target_groups)
 
 
 def get_value(client, key, default=None):
@@ -200,3 +217,30 @@ def _get_target_groups(identifiers: list) -> dict:
         groups[group_id] = target_group
 
     return groups
+
+
+def _get_listener_groups(alb_id):
+    host, port = get_etcd_addr()
+    client = etcd.Client(host=host, port=int(port))
+    listener_groups = {}
+
+    try:
+        lg_prefix = '/alb/{name}/listener_groups'.format(name=alb_id)
+        for i in client.read(lg_prefix).children:
+            lg_id = i.key[1:].split("/")[-1]
+
+            lg_path = lg_prefix + '/' + lg_id
+            domains = get_json(client, lg_path + '/domains')
+            listener_ids = get_json(client, lg_path + '/listeners')
+            certificate_name = get_value(client, lg_path + '/certificate_name')
+            use_certbot = get_value(client, lg_path + '/use_certbot')
+
+
+            lg = ListenerGroup(lg_id, listeners=listener_ids, domains=domains, certificate_name=certificate_name,
+                               use_certbot=True if use_certbot == 'true' else False)
+            listener_groups[lg_id] = lg
+    except (etcd.EtcdKeyNotFound, KeyError, ValueError):
+        pass
+
+    return listener_groups
+

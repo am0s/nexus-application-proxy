@@ -115,7 +115,7 @@ def cli_show_config(args=None):
     alb_id = os.environ.get('ALB_ID', args.alb_id)
 
     try:
-        alb_config = get_alb(alb_id)
+        alb_config = get_alb(alb_id, with_listener_group=True)
 
         if args.show_haproxy:
             print(generate_config(alb_config))
@@ -127,7 +127,15 @@ def cli_show_config(args=None):
                 print("   port: {}".format(listener.port))
                 print("   rules:")
                 for rule in listener.rules:
-                    print("   `- host: {}, path: {}, action: {}".format(rule.host or '-', rule.path or '-', rule.action))
+                    print("   `- host: {}, path: {}, action: {}".format(rule.host or '-', rule.path or '-',
+                                                                        rule.action))
+            print("Listener groups:")
+            for listener_group in alb_config.listener_groups:
+                print("`- {}".format(listener_group.identifier))
+                print("   domains: {}".format(listener_group.domains))
+                print("   listeners: {}".format(listener_group.listeners))
+                print("   certificate name: {}".format(listener_group.certificate_name))
+                print("   use certbot: {}".format(listener_group.use_certbot))
             print("Target Groups:")
             for target_group in alb_config.target_groups:
                 print("`- {}".format(target_group.identifier))

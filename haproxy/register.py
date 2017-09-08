@@ -449,7 +449,7 @@ def register_vhost(args=None):
                               rules=rules)
             listeners.append('custom-{}-{}'.format(listener_port_num, main_domain))
         except ValueError:
-            print("Listener port number '{}' must be a number or on of 'http', 'https', 'mixed'".format(listener_port),
+            print("Listener port number '{}' must be a number or one of 'http', 'https', 'mixed'".format(listener_port),
                   file=sys.stderr)
             sys.exit(1)
 
