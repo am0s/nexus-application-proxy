@@ -184,6 +184,36 @@ def register_listener(client: etcd.Client, alb, identifier, name, port, protocol
             }))
 
 
+def register_listener_group(client: etcd.Client, alb, listener_id, domains=None, listeners=None,
+                            certificate_name=None, use_certbot=False):
+    try:
+        client.read("/alb/{alb}/listener_groups/{identifier}".format(alb=alb, identifier=listener_id))
+    except (etcd.EtcdKeyNotFound, KeyError):
+        client.write("/alb/{alb}/listener_groups/{identifier}".format(alb=alb, identifier=listener_id), None, dir=True)
+    # client.write("/alb/{alb}/listener_groups/{identifier}/name".format(alb=alb, identifier=listener_id), name)
+    client.write("/alb/{alb}/listener_groups/{identifier}/domains".format(alb=alb, identifier=listener_id),
+                 json.dumps(domains))
+    client.write("/alb/{alb}/listener_groups/{identifier}/listeners".format(alb=alb, identifier=listener_id),
+                 json.dumps(listeners))
+    client.write("/alb/{alb}/listener_groups/{identifier}/certificate_name".format(alb=alb, identifier=listener_id),
+                 certificate_name)
+    client.write("/alb/{alb}/listener_groups/{identifier}/use_certbot".format(alb=alb, identifier=listener_id),
+                 'true' if use_certbot else 'false')
+
+
+def upload_certificate_file(client: etcd.Client, certificate_name, certificate_file):
+    try:
+        client.read("/certs/{cert_name}".format(cert_name=certificate_name))
+    except (etcd.EtcdKeyNotFound, KeyError):
+        client.write("/certs/{cert_name}".format(cert_name=certificate_name), None, dir=True)
+    if isinstance(certificate_file, str):
+        with open(certificate_file) as cert_fh:
+            certificate_content = cert_fh.read()
+    else:
+        certificate_content = certificate_file.read()
+    client.write("/certs/{cert_name}/cert".format(cert_name=certificate_name), certificate_content)
+
+
 def auto_register_docker(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
@@ -237,16 +267,17 @@ def register_vhost(args=None):
     parser.add_argument("--reset", default=None,
                         help="Resets any existing configuration before writing the new configuration")
     parser.add_argument("--id", default=None,
-                        help="ID of target group, defaults to first domain")
+                        help="ID of target group and listener group, defaults to first domain")
     parser.add_argument("--port", default='https',
                         help="Which port to use for listener in load-balancer, specify a number "
                              "or use http for HTTP only, https for https only or mixed for http and https. "
                              "defaults to https")
     parser.add_argument("--certificate", default=None,
                         help="Path to certificate file (pem) to upload")
+    parser.add_argument("--certbot", action="store_true", default=False,
+                        help="Auto creation of certificate using letsencrypt")
     parser.add_argument("--certificate-name", default=None,
-                        help="Name of certificate entry to use, or specify 'letsencrypt' for auto "
-                             "creation using letsencrypt")
+                        help="Name of certificate entry to use, default is to use ID of listener group")
     parser.add_argument("virtual_host",
                         help="domains to register")
     parser.add_argument("target",
@@ -283,8 +314,13 @@ def register_vhost(args=None):
 
     main_domain = listener_domains[0]
     tg_id = args.id or ('vhost-' + main_domain)
+    listener_id = tg_id
     tg_name = 'VirtualHost: ' + main_domain
     alb_identifier = 'vhost'
+
+    certificate = args.certificate
+    certificate_name = args.certificate_name or listener_id
+    use_certbot = args.certbot
 
     targets = []
     removed_targets = []
@@ -334,6 +370,8 @@ def register_vhost(args=None):
             listener_port = 'https'
     except ValueError:
         pass
+
+    listeners = []
     if listener_port == 'http':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)
         remove_listener(client, alb=alb_identifier, identifier='https-' + main_domain)
@@ -348,6 +386,7 @@ def register_vhost(args=None):
             })
         register_listener(client, alb=alb_identifier, identifier='http-' + main_domain, name='HTTP 80', port=80,
                           protocol='http', rules=rules)
+        listeners.append('http-' + main_domain)
     elif listener_port == 'https':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)
         remove_listener(client, alb=alb_identifier, identifier='https-' + main_domain)
@@ -371,6 +410,8 @@ def register_vhost(args=None):
                           protocol='https', rules=https_rules)
         register_listener(client, alb=alb_identifier, identifier='http-' + main_domain, name='HTTP 80', port=80,
                           protocol='http', rules=http_rules)
+        listeners.append('https-' + main_domain)
+        listeners.append('http-' + main_domain)
         # TODO: Add a rule which upgrades http to https
     elif listener_port == 'mixed':
         remove_listener(client, alb=alb_identifier, identifier='http-' + main_domain)
@@ -404,11 +445,25 @@ def register_vhost(args=None):
             register_listener(client, alb=alb_identifier,
                               identifier='custom-{}-{}'.format(listener_port_num, main_domain), name='HTTP 80',
                               port=listener_port_num,
+                              protocol='http',
                               rules=rules)
+            listeners.append('custom-{}-{}'.format(listener_port_num, main_domain))
         except ValueError:
             print("Listener port number '{}' must be a number or on of 'http', 'https', 'mixed'".format(listener_port),
                   file=sys.stderr)
             sys.exit(1)
+
+    # Register listener groups, contains all domains and listeners
+    domains = []
+    for domain in listener_domains:
+        domain, path = (domain.split('/', 1) + [None])[0:2]
+        domains.append(domain)
+
+    register_listener_group(client, alb_identifier, listener_id, domains=domains, listeners=listeners,
+                            certificate_name=certificate_name, use_certbot=use_certbot)
+
+    if certificate and not use_certbot:
+        upload_certificate_file(client, certificate_name, certificate)
 
 
 def cli_register_vhost(args=None):
