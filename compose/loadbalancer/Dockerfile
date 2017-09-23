@@ -44,6 +44,10 @@ RUN apt-get update && apt-get install rsyslog -y && \
 
 ADD config/syslog/haproxy.conf /etc/rsyslog.d/70-haproxy.conf
 
+RUN apt-get update && apt-get install -y rsync openssl --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /etc/haproxy/errorfiles/
+COPY ./compose/loadbalancer/503sorry.http /etc/haproxy/errorfiles/
+
 ADD . /app
 
 WORKDIR /app

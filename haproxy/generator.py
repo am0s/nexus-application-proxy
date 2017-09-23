@@ -38,7 +38,7 @@ def write_config(alb_config: LoadBalancerConfig, template_filename=None, filenam
     with open(filename or "/etc/haproxy.cfg", "w") as f:
         context = create_context()
         context.update({
-            'listener_groups': alb_config.port_groups,
+            'port_groups': alb_config.port_groups,
             'target_groups': alb_config.target_groups,
         })
         f.write(template.render(context))
@@ -55,7 +55,7 @@ def generate_config(alb_config: LoadBalancerConfig, template_filename=None) -> s
     template = env.from_string(open(template_filename or HAPROXY_TEMPLATE).read())
     context = create_context()
     context.update({
-        'listener_groups': alb_config.port_groups,
+        'port_groups': alb_config.port_groups,
         'target_groups': alb_config.target_groups,
     })
     return template.render(context)

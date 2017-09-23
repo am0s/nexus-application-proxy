@@ -2,19 +2,30 @@
 import argparse
 import logging
 import os
+import socket
 import subprocess
 import sys
 import time
+from datetime import datetime
 from subprocess import call
 
 import jinja2
 
+from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
-from .services import NoListeners, NoTargetGroups
+from .services import NoListeners, NoTargetGroups, CertBot
 from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
-from .manager import get_alb
+from .manager import get_alb, transfer_certificates, mark_certbots_ready
 
+logging.basicConfig(style='$')
 logger = logging.getLogger('docker-alb')
+logger.setLevel(level=logging.DEBUG)
+debug_console = logging.StreamHandler(stream=sys.stdout)
+debug_console.setLevel(logging.DEBUG)
+debug_console.setFormatter(logging.Formatter('${levelname}:${name}:${message}', style='$'))
+logger.propagate = False
+
+logger.addHandler(debug_console)
 
 
 def cli_run_alb(args=None):
@@ -43,7 +54,7 @@ def cli_run_alb(args=None):
         logger.info("Polling configuration from etcd")
     while True:
         try:
-            alb_config = get_alb(alb_id)
+            alb_config = get_alb(alb_id, with_listener_group=True)
 
             new_config_mtime = int(os.path.getmtime(HAPROXY_TEMPLATE))
             if verbosity >= 3:
@@ -51,6 +62,10 @@ def cli_run_alb(args=None):
             if new_config_mtime == config_mtime and alb_config.listeners_map == current_listeners_map:
                 time.sleep(POLL_TIMEOUT)
                 continue
+
+            if verbosity >= 1:
+                logger.debug("Config changed. Transferring certificates")
+            transfer_certificates(alb_config)
 
             if verbosity >= 1:
                 logger.debug("Config changed. reload haproxy")
@@ -65,13 +80,14 @@ def cli_run_alb(args=None):
                 continue
 
             if verbosity >= 2:
-                logger.error("Reloading haproxy")
+                logger.info("Reloading haproxy")
             ret = call("./reload-haproxy.sh", shell=True)
             if ret != 0:
                 logger.error("Reloading haproxy returned non-zero value: %s", ret)
                 time.sleep(POLL_TIMEOUT)
                 continue
             current_listeners_map = alb_config.listeners_map.copy()
+            mark_certbots_ready(alb_config)
 
         except NoListeners:
             if verbosity >= 1:
@@ -165,6 +181,95 @@ def cli_show_config(args=None):
     except Exception as e:
         if verbosity >= 0:
             print("Unknown error:", e, file=sys.stderr)
+        sys.exit(1)
+
+
+def cli_renew_certs(args=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=1)
+    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
+    parser.add_argument("--etcd-host", dest="etcd_host", default=None,
+                        help="hostname for etcd server")
+    parser.add_argument("--host-name", default=None,
+                        help="hostname/ip of host where certbot may be reached, if running in a docker container use"
+                             "the public ip of the docker host")
+    parser.add_argument("--host-port", default=None,
+                        help="port where certbot may be reached (on host-ip)")
+    parser.add_argument("--alb-identifier", dest="alb_id", default=None,
+                        help="Identifier for application load balancer to check for certs, if unset renews all ALBs")
+    parser.add_argument("--email", default=None,
+                        help="Email address to register certificates to")
+    args = parser.parse_args(args)
+    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
+    if verbosity is not None:
+        try:
+            verbosity = int(verbosity)
+        except ValueError:
+            verbosity = None
+    if verbosity is None:
+        verbosity = args.verbosity
+    alb_id = args.alb_id or os.environ.get('ALB_ID')
+    host_name = args.host_name or os.environ.get('HOST_NAME')
+    host_port = args.host_port or os.environ.get('HOST_PORT')
+    if not host_name:
+        logger.error("No host IP set, use --host-ip option or set HOST_NAME environment variable")
+        sys.exit(1)
+    if not host_port:
+        logger.error("No host port set, use --host-port option or set HOST_PORT environment variable")
+        sys.exit(1)
+    email = args.email or os.environ.get("EMAIL")
+    if not email:
+        logger.error("No email address set, use --email or set EMAIL environment variable")
+        sys.exit(1)
+
+    host_ip = socket.gethostbyname(host_name)
+
+    client = etcd_client(args.etcd_host)
+
+    def scan_alb(alb_identifier):
+        alb_config = get_alb(alb_identifier, with_listener_group=True)
+        for listener_group in alb_config.listener_groups:  # type: ListenerGroup
+            logger.debug(listener_group)
+            if not listener_group.use_certbot or not listener_group.domains:
+                continue
+            # certbot = listener_group.certbot  # type: CertBot
+            try:
+                register_certbot(client, alb=alb_identifier, listener_id=listener_group.identifier,
+                                 domains=listener_group.domains, target=[host_ip, host_port],
+                                 certificate_name=listener_group.certificate_name)
+                logger.debug("Waiting for certbot %s in ALB %s to be setup", listener_group.identifier, alb_identifier)
+                if not wait_certbot_ready(client, alb=alb_identifier, listener_id=listener_group.identifier):
+                    logger.error("Failed to wait for ALB '{}' to setup up certbot config for id={}, domains={}".format(
+                        alb_identifier, listener_group.identifier, listener_group.domains))
+                    unregister_certbot(client, alb=alb_identifier, listener_id=listener_group.identifier)
+                    continue
+
+                register_certificate(client, certificate_name=listener_group.identifier, domains=listener_group.domains,
+                                     email=email, modified=datetime.now())
+                domain_args = sum([["-d", domain] for domain in listener_group.domains], [])
+                certbot_args = ["certbot", "certonly", "--verbose", "--noninteractive", "--standalone",
+                                "--preferred-challenges", "http", "--agree-tos", "--email", email,
+                                "--cert-name", listener_group.identifier] + domain_args
+                logger.debug("certbot command: %s", " ".join(certbot_args))
+                input("Press enter")
+                call(certbot_args)
+                input("Press enter")
+            finally:
+                # Certbot done or failed, unregister from listener
+                unregister_certbot(client, alb=alb_identifier, listener_id=listener_group.identifier)
+
+    try:
+        scan_alb(alb_id)
+    except (NoListeners, NoTargetGroups):
+        if verbosity >= 1:
+            print("No configuration found")
+    except ConfigurationError as e:
+        if verbosity >= 0:
+            print("Etcd host is not defined: ", e, file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        if verbosity >= 0:
+            logger.error("Unknown error: %s", e)
         sys.exit(1)
 
 

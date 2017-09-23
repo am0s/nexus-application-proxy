@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import hashlib
 import logging
+from datetime import datetime
 
 logger = logging.getLogger('docker-alb')
 
@@ -43,6 +44,9 @@ class LoadBalancerConfig(object):
         listeners = self.listeners
         groups = {}  # type: Dict[int, PortGroup]
         for listener in listeners:
+            # Do not include listeners for https if the certificate is not valid
+            if listener.protocol == 'https' and (listener.certificate is None or not listener.certificate.is_valid):
+                continue
             if listener.port not in groups:
                 groups[listener.port] = PortGroup('lg_' + str(listener.port), port=listener.port,
                                                   protocol=listener.protocol, listeners=[listener])
@@ -64,19 +68,24 @@ class LoadBalancerConfig(object):
 
 
 class Listener(object):
-    def __init__(self, identifier: str, port: int = None, rules: list = None, protocol='http'):
+    def __init__(self, identifier: str, port: int = None, rules: list = None, protocol='http',
+                 certificate_name: str = None, certificate: "Certificate" = None):
         self.identifier = identifier
         self.port = port
         self.rules = list(rules or [])
         self.protocol = protocol
+        if not certificate_name and certificate:
+            certificate_name = certificate.identifier
+        self.certificate_name = certificate_name
+        self.certificate = certificate
 
     def __eq__(self, other: "Listener"):
         return self.identifier == other.identifier and self.port == other.port and self.rules == other.rules and \
-               self.protocol == other.protocol
+               self.protocol == other.protocol and self.certificate == other.certificate
 
     def __repr__(self):
-        return "Listener({!r},port={!r},rules={!r})".format(
-            self.identifier, self.port, self.rules)
+        return "Listener({!r},port={!r},rules={!r},protocol={!r},certificate={!r})".format(
+            self.identifier, self.port, self.rules, self.protocol, self.certificate)
 
     @property
     def slug(self):
@@ -117,8 +126,8 @@ class PortGroup(object):
 
 
 class ListenerGroup(object):
-    def __init__(self, identifier: str, listeners: list = None, domains: list = None, certificate_name: str =None,
-                 use_certbot: bool = False):
+    def __init__(self, identifier: str, listeners: list = None, domains: list = None, certificate_name: str = None,
+                 use_certbot: bool = False, certbot: "CertBot" = None):
         """
         Groups configuration for a set of listeners and domains.
 
@@ -127,20 +136,24 @@ class ListenerGroup(object):
         :param domains: List of domains registered to this group.
         :param certificate_name: Name of certificate entry which holds the certificate file
         :param use_certbot: If True then certificates are managed by certbot.
+        :param certbot: Configuration for certbot or None if unset.
         """
         self.identifier = identifier
         self.listeners = list(listeners or [])
         self.domains = domains
         self.certificate_name = certificate_name
         self.use_certbot = use_certbot
+        self.certbot = certbot
 
     def __eq__(self, other: "ListenerGroup"):
-        return self.identifier == other.identifier and self.port == other.port and \
-               self.listeners == other.listeners and self.protocol == other.protocol
+        return self.identifier == other.identifier and self.domains == other.domains and \
+               self.listeners == other.listeners and self.certificate_name == other.certificate_name and \
+               self.use_certbot == other.use_certbot and self.certbot == other.certbot
 
     def __repr__(self):
-        return "ListenerGroup({!r},port={!r},listeners={!r},protocol={!r})".format(
-            self.identifier, self.port, self.listeners, self.protocol)
+        return "ListenerGroup({!r},domains={!r},listeners={!r},certificate_name={!r},use_certbot={!r}," \
+               "certbot={!r})".format(
+                self.identifier, self.domains, self.listeners, self.certificate_name, self.use_certbot, self.certbot)
 
     @property
     def slug(self):
@@ -148,7 +161,16 @@ class ListenerGroup(object):
 
 
 class Rule(object):
-    def __init__(self, host: str = None, path: str = None, action: str = None, target_group: "Target" = None):
+    def __init__(self, host: str = None, path: str = None, action: str = None, target_group: "Target" = None,
+                 pri: int = 0):
+        """
+
+        :param host:
+        :param path:
+        :param action:
+        :param target_group:
+        :param pri: Priority value, higher values have higher priority and will be run first.
+        """
         self.host = host
         self.path = path
         self.action = action
@@ -162,12 +184,14 @@ class Rule(object):
         elif action and action.startswith("status:"):
             self.action_type = "status"
             self.status_code = action[7:]
+        self.pri = pri
 
     def __eq__(self, other: "Rule"):
-        return self.path == other.path and self.host == other.host and self.action == other.action
+        return self.path == other.path and self.host == other.host and self.action == other.action and \
+               self.pri == other.pri
 
     def __repr__(self):
-        return "Rule(host={!r},path={!r},action={!r})".format(self.host, self.path, self.action)
+        return "Rule(host={!r},path={!r},action={!r},pri={!r})".format(self.host, self.path, self.action, self.pri)
 
 
 class HealthCheck(object):
@@ -255,3 +279,69 @@ class Target(object):
         m = hashlib.md5()
         m.update("{}:{}".format(self.host, self.port).encode('utf8'))
         return m.hexdigest()
+
+
+class CertBot(object):
+    def __init__(self, identifier: str, target_ip: str = None, target_port: int = None, domains: list = None,
+                 certificate_name: str = None):
+        """
+        Configuration for a certbot
+
+        :param identifier: Identifier for the group.
+        :param domains: List of domains registered to this group.
+        :param certificate_name: Name of certificate entry which holds the certificate file
+        :param target_ip: IP for target running certbot
+        :param target_port: Port of target running certbot
+        """
+        self.identifier = identifier
+        self.domains = domains
+        self.certificate_name = certificate_name
+        self.target_ip = target_ip
+        self.target_port = target_port
+
+    def __eq__(self, other: "CertBot"):
+        return self.identifier == other.identifier and self.domains == other.domains and \
+               self.target_ip == other.target_ip and self.target_port == other.target_port and \
+               self.certificate_name == other.certificate_name
+
+    def __repr__(self):
+        return "CertBot({!r},target_ip={!r},target_port={!r},domains={!r},certificate_name={!r})".format(
+            self.identifier, self.target_ip, self.target_port, self.domains, self.certificate_name)
+
+    @property
+    def slug(self):
+        return self.identifier.replace(".", "_").replace("-", "_")
+
+
+class Certificate(object):
+    def __init__(self, identifier: str, pem_data: str = None, email: str = None, domains: list = None,
+                 modified: datetime = None, is_valid=None):
+        """
+        Certificate data.
+
+        :param identifier: Identifier/name for the certificate.
+        :param domains: List of domains registered to this group.
+        :param modified: Last modified datetime for certificate.
+        :param pem_data: Data for PEM file.
+        :param email: Email address of owner of certificate.
+        :param is_valid: Determines if the certificate is valid for usage. If None it is determined from pem data.
+        """
+        self.identifier = identifier
+        self.domains = domains
+        self.modified = modified
+        self.pem_data = pem_data
+        self.email = email
+        self.is_valid = bool(pem_data) if is_valid is None else is_valid
+
+    def __eq__(self, other: "Certificate"):
+        return self.identifier == other.identifier and self.domains == other.domains and \
+               self.pem_data == other.pem_data and self.email == other.email and \
+               self.modified == other.modified and self.is_valid == other.is_valid
+
+    def __repr__(self):
+        return "Certificate({!r},pem_data={!r},email={!r},domains={!r},modified={!r},is_valid={!r})".format(
+            self.identifier, self.pem_data, self.email, self.domains, self.modified, self.is_valid)
+
+    @property
+    def slug(self):
+        return self.identifier.replace(".", "_").replace("-", "_")
