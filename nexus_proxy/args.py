@@ -151,7 +151,7 @@ def setup_alb_run_cmd(command_parsers: argparse._SubParsersAction):
 
 def setup_alb_show_cmd(command_parsers: argparse._SubParsersAction):
     parser = command_parsers.add_parser(
-        'run', help='Show configuration for an Application Load Balancer')  # type: argparse.ArgumentParser
+        'show', help='Show configuration for an Application Load Balancer')  # type: argparse.ArgumentParser
     setup_common_args(parser)
 
     parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
