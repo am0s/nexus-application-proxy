@@ -11,11 +11,11 @@ from subprocess import call
 
 import jinja2
 
-from .args import process_verbosity, setup_alb_cmd, setup_certificate_cmd
+from .args import process_verbosity, setup_alb_cmd, setup_certificate_cmd, setup_listener_cmd
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
 from .manager import get_alb, transfer_certificates, mark_certbots_ready
 from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate, \
-    upload_certificate, register_vhost
+    upload_certificate, register_vhost, auto_register_docker
 from .services import NoListeners, NoTargetGroups
 from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
 
@@ -45,6 +45,7 @@ def cli_manage(args=None):
 
     command_parsers = parser.add_subparsers(dest="cmd")
     setup_alb_cmd(command_parsers)
+    setup_listener_cmd(command_parsers)
     setup_certificate_cmd(command_parsers)
 
     args = parser.parse_args(args)
@@ -63,7 +64,9 @@ def cli_manage(args=None):
                 raise MissingArgumentError("Please select sub-commands for 'alb'")
         elif cmd == "listener":
             listener_cmd = args.listener_cmd
-            if listener_cmd == 'register-vhost':
+            if listener_cmd == 'register-docker':
+                auto_register_docker(args)
+            elif listener_cmd == 'register-vhost':
                 register_vhost(args)
             else:
                 raise MissingArgumentError("Please select sub-commands for 'listener'")

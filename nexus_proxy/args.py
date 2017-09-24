@@ -22,7 +22,16 @@ def setup_listener_cmd(command_parsers: argparse._SubParsersAction):
     parser = command_parsers.add_parser(
         'listener', help='Listener management')  # type: argparse.ArgumentParser
     command_parsers = parser.add_subparsers(dest="listener_cmd")
+    setup_register_cmd(command_parsers)
     setup_register_vhost_cmd(command_parsers)
+
+
+def setup_register_cmd(command_parsers: argparse._SubParsersAction):
+    """
+    Setup 'listener register-docker' command, register configuration written by docker-gen.
+    """
+    parser = command_parsers.add_parser(
+        'register-docker', help='Register listeners from docker-gen configuration')  # type: argparse.ArgumentParser
 
 
 def setup_register_vhost_cmd(command_parsers: argparse._SubParsersAction):

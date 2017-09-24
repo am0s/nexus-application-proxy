@@ -355,24 +355,7 @@ def upload_certificate_data(client: etcd.Client, certificate_name, data, modifie
                      'false')
 
 
-def auto_register_docker(args=None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
-    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
-
-    parser.add_argument("--etcd-host", dest="etcd_host", default=None,
-                        help="hostname for etcd server")
-
-    args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
-
+def auto_register_docker(args):
     etcd_host = os.environ.get("ETCD_HOST", args.etcd_host)
     backend_host = os.environ.get("HOST_IP")
     if not etcd_host:
