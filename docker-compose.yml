@@ -34,8 +34,7 @@ services:
       dockerfile: compose/autodiscover/Dockerfile
     volumes:
       - ./:/app
-      # Uncomment to allow docker to be used inside container (no Windows support yet)
-#      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKER_SOCKET}:/var/run/docker.sock
     environment:
       - ETCD_HOST=etcd:2379
     env_file:
