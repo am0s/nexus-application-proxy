@@ -14,7 +14,8 @@ import jinja2
 from .args import process_verbosity, setup_alb_cmd, setup_certificate_cmd
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
 from .manager import get_alb, transfer_certificates, mark_certbots_ready
-from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate
+from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate, \
+    upload_certificate
 from .services import NoListeners, NoTargetGroups
 from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
 
@@ -55,7 +56,7 @@ def cli_manage(args=None):
         elif cmd == "certificate":
             cert_cmd = args.cert_cmd
             if cert_cmd == 'upload':
-                pass
+                upload_certificate(args)
         else:
             sys.exit(1)
     except Exception as e:

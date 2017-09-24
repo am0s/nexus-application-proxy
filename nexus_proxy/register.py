@@ -621,42 +621,10 @@ def cli_register_vhost(args=None):
         sys.exit(1)
 
 
-def upload_certificate(args=None):
+def upload_certificate(args):
     """
     Uploads certificate files.
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
-    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
-
-    parser.add_argument("--etcd-host", dest="etcd_host", default=None,
-                        help="hostname for etcd server")
-
-    parser.add_argument("--certificate-name", default=None,
-                        help="Name of certificate entry to use, must match name used in listeners")
-    parser.add_argument("--certificate", default=None,
-                        help="Path to certificate file (pem) to upload containing full chain and private key")
-    parser.add_argument("--full-chain", default=None,
-                        help="Path to file containing full chain of certificates")
-    parser.add_argument("--private-key", default=None,
-                        help="Path to file containing private key")
-
-    parser.add_argument("--email", default=None,
-                        help="Email address of owner of certificate")
-    parser.add_argument("--domain", dest="domains", metavar="domain", default=[], nargs="*",
-                        help="Domain name used in certificate, can be specified multiple times")
-    # TODO: See if domains (and email) can be read from certificate using ssl tools
-
-    args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
-
     client = etcd_client(args.etcd_host)
 
     certificate = args.certificate
@@ -717,11 +685,3 @@ def upload_certificate(args=None):
                              modified=datetime.now())
     else:
         upload_certificate_data(client, certificate_name, pem_data)
-
-
-def cli_upload_certificate(args=None):
-    try:
-        upload_certificate(args=args)
-    except Exception as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
