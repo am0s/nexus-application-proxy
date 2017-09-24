@@ -209,10 +209,6 @@ def cli_show_config(args):
         if verbosity >= 0:
             print("Etcd host is not defined: ", e, file=sys.stderr)
         sys.exit(1)
-    except Exception as e:
-        if verbosity >= 0:
-            print("Unknown error:", e, file=sys.stderr)
-        sys.exit(1)
 
 
 def cli_renew_certs(args):
