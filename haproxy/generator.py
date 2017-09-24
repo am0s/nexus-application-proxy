@@ -20,6 +20,7 @@ def create_context():
         stats = {
             'auth_user': os.environ.get('STATS_AUTH_USER'),
             'auth_passwd': os.environ.get('STATS_AUTH_PASSWORD'),
+            'path': os.environ.get('STATS_PATH', '/_hastats'),
         }
     return {
         'log_sidecar': log_sidecar,
