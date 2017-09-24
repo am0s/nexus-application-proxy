@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import signal
 
-from haproxy.cli import cli_run_alb
+from nexus_proxy.cli import cli_run_alb
 
 signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 

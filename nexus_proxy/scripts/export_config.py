@@ -5,9 +5,9 @@ import argparse
 import sys
 import json
 
-from haproxy.manager import get_listeners
-from haproxy.services import NoListeners
-from haproxy.utils import ConfigurationError
+from nexus_proxy.manager import get_listeners
+from nexus_proxy.services import NoListeners
+from nexus_proxy.utils import ConfigurationError
 
 
 def main(args=None):
