@@ -15,6 +15,16 @@ def process_verbosity(args):
     args.verbosity = verbosity
 
 
+def setup_common_args(parser: argparse.ArgumentParser):
+    parser.set_defaults(verbosity=0, etcd_host=None)
+    parser.add_argument("--verbose", "-v", dest="verbosity", action='count',
+                        help="increase verbosity level")
+    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1,
+                        help="suppress non-error messages")
+    parser.add_argument("--etcd-host", dest="etcd_host", metavar="HOST",
+                        help="hostname for etcd server, if unset uses ETCD_HOST env variable")
+
+
 def setup_listener_cmd(command_parsers: argparse._SubParsersAction):
     """
     Setup 'listener' command, contains sub-commands.
@@ -32,6 +42,7 @@ def setup_register_cmd(command_parsers: argparse._SubParsersAction):
     """
     parser = command_parsers.add_parser(
         'register-docker', help='Register listeners from docker-gen configuration')  # type: argparse.ArgumentParser
+    setup_common_args(parser)
 
 
 def setup_register_vhost_cmd(command_parsers: argparse._SubParsersAction):
@@ -40,6 +51,8 @@ def setup_register_vhost_cmd(command_parsers: argparse._SubParsersAction):
     """
     parser = command_parsers.add_parser(
         'register-vhost', help='Register virtual-host listener')  # type: argparse.ArgumentParser
+    setup_common_args(parser)
+
     parser.add_argument("--reset", default=None,
                         help="Resets any existing configuration before writing the new configuration")
     parser.add_argument("--id", default=None,
@@ -78,6 +91,7 @@ def setup_upload_certificate_cmd(command_parsers: argparse._SubParsersAction):
     Setup 'certificate upload' command, uploads certificate files.
     """
     parser = command_parsers.add_parser('upload', help='Upload certificates to store')  # type: argparse.ArgumentParser
+    setup_common_args(parser)
 
     parser.add_argument("certificate-name", default=None,
                         help="Name of certificate entry to use, must match name used in listeners")
@@ -101,6 +115,7 @@ def setup_renew_certificate_cmd(command_parsers: argparse._SubParsersAction):
     """
     parser = command_parsers.add_parser(
         'renew', help='Renew certificates that are auto-managed (letsencrypt)')  # type: argparse.ArgumentParser
+    setup_common_args(parser)
 
     parser.add_argument("--host-name", default=None,
                         help="hostname/ip of host where certbot may be reached, if running in a docker container use"
@@ -128,6 +143,7 @@ def setup_alb_cmd(command_parsers: argparse._SubParsersAction):
 def setup_alb_run_cmd(command_parsers: argparse._SubParsersAction):
     parser = command_parsers.add_parser(
         'run', help='Start an application load balancer service')  # type: argparse.ArgumentParser
+    setup_common_args(parser)
 
     parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
                         help="Identifier for application load balancer to setup, defaults to vhost")
@@ -136,6 +152,7 @@ def setup_alb_run_cmd(command_parsers: argparse._SubParsersAction):
 def setup_alb_show_cmd(command_parsers: argparse._SubParsersAction):
     parser = command_parsers.add_parser(
         'run', help='Show configuration for an Application Load Balancer')  # type: argparse.ArgumentParser
+    setup_common_args(parser)
 
     parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
                         help="Identifier for application load balancer to setup, defaults to vhost")
