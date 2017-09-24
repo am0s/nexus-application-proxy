@@ -30,6 +30,12 @@ logger.propagate = False
 logger.addHandler(debug_console)
 
 
+class MissingArgumentError(Exception):
+    """
+    Error used when arguments are missing, passed string is printed as output
+    """
+
+
 def cli_manage(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
@@ -53,12 +59,20 @@ def cli_manage(args=None):
                 cli_run_alb(args)
             elif alb_cmd == 'show':
                 cli_show_config(args)
+            else:
+                raise MissingArgumentError("Please select sub-commands for 'alb'")
         elif cmd == "certificate":
             cert_cmd = args.cert_cmd
             if cert_cmd == 'upload':
                 upload_certificate(args)
+            else:
+                raise MissingArgumentError("Please select sub-commands for 'certificate'")
         else:
             sys.exit(1)
+    except MissingArgumentError as e:
+        if args.verbosity >= 0:
+            print(e, file=sys.stderr)
+        sys.exit(2)
     except Exception as e:
         if args.verbosity >= 0:
             print("Unknown error:", e, file=sys.stderr)
