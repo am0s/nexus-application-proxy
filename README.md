@@ -1,8 +1,8 @@
-# Application Proxy
+# Nexus Application Proxy
 
-Application Proxy is a set of services to aid in exposing web services
-trough a single load-balancer/proxy. The proxy is flexible and supports
-regular http and https setup as well as ssl termination.
+Nexus Application Proxy (NAP) is a set of services to aid in exposing
+web services trough a single load-balancer/proxy. The proxy is flexible
+and supports regular http and https setup as well as ssl termination.
 
 Consist of:
 - A load-balancer/proxy using haproxy
