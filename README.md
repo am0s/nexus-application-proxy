@@ -1,5 +1,7 @@
 # Nexus Application Proxy
 
+Note: This software is currently in alpha and might change. CLI and configuration storage are not set in stone.
+
 Nexus Application Proxy (NAP) is a set of services to aid in exposing
 web services trough a single load-balancer/proxy. The proxy is flexible
 and supports regular http and https setup as well as ssl termination.
