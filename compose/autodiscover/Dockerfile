@@ -17,4 +17,4 @@ ADD . /app
 
 ENV DOCKER_HOST unix:///var/run/docker.sock
 
-CMD docker-gen -interval 10 -watch -notify "python3 register.py" config/docker_gen/etcd_config.tmpl /tmp/etcd_config.py
+CMD docker-gen -interval 10 -watch -notify "python3 nap.py listener register-docker" config/docker_gen/etcd_config.tmpl /tmp/etcd_config.py
