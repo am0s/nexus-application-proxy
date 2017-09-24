@@ -14,15 +14,17 @@ def create_context():
     log_sidecar = os.environ.get('LOG_SIDECAR')
     if log_sidecar:
         log_path = os.environ.get('LOG_SIDECAR_PATH', DEFAULT_LOG_SIDECAR_PATH)
+    stats = None
     stats_enabled = os.environ.get('STATS_ENABLED', '')
-    stats_auth_user = os.environ.get('STATS_AUTH_USER')
-    stats_auth_passwd = os.environ.get('STATS_AUTH_PASSWORD')
+    if stats_enabled in ('yes', 'true', '1'):
+        stats = {
+            'auth_user': os.environ.get('STATS_AUTH_USER'),
+            'auth_passwd': os.environ.get('STATS_AUTH_PASSWORD'),
+        }
     return {
         'log_sidecar': log_sidecar,
         'log_path': log_path,
-        'stats_enabled': stats_enabled,
-        'stats_auth_user': stats_auth_user,
-        'stats_auth_passwd': stats_auth_passwd,
+        'stats': stats,
     }
 
 
