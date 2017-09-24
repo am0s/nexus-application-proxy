@@ -65,6 +65,8 @@ def cli_manage(args=None):
             cert_cmd = args.cert_cmd
             if cert_cmd == 'upload':
                 upload_certificate(args)
+            elif cert_cmd == 'renew':
+                cli_renew_certs(args)
             else:
                 raise MissingArgumentError("Please select sub-commands for 'certificate'")
         else:
@@ -207,30 +209,8 @@ def cli_show_config(args):
         sys.exit(1)
 
 
-def cli_renew_certs(args=None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=1)
-    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
-    parser.add_argument("--etcd-host", dest="etcd_host", default=None,
-                        help="hostname for etcd server")
-    parser.add_argument("--host-name", default=None,
-                        help="hostname/ip of host where certbot may be reached, if running in a docker container use"
-                             "the public ip of the docker host")
-    parser.add_argument("--host-port", default=None,
-                        help="port where certbot may be reached (on host-ip)")
-    parser.add_argument("--alb-identifier", dest="alb_id", default=None,
-                        help="Identifier for application load balancer to check for certs, if unset renews all ALBs")
-    parser.add_argument("--email", default=None,
-                        help="Email address to register certificates to")
-    args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
+def cli_renew_certs(args):
+    verbosity = args.verbosity
     alb_id = args.alb_id or os.environ.get('ALB_ID')
     host_name = args.host_name or os.environ.get('HOST_NAME')
     host_port = args.host_port or os.environ.get('HOST_PORT')
@@ -289,10 +269,6 @@ def cli_renew_certs(args=None):
     except ConfigurationError as e:
         if verbosity >= 0:
             print("Etcd host is not defined: ", e, file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        if verbosity >= 0:
-            logger.error("Unknown error: %s", e)
         sys.exit(1)
 
 
