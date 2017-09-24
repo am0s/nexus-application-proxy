@@ -62,7 +62,7 @@ services:
       - certificates:/etc/letsencrypt
       - ./:/app
     ports:
-      - 8003:80
+      - ${CERTBOT_PORT}:80
     command: /bin/true
 #    command: certificates
 
