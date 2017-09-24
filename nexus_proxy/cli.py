@@ -11,11 +11,13 @@ from subprocess import call
 
 import jinja2
 
-from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate
+from args import setup_alb_cmd, setup_certificate_cmd
+from .args import get_verbosity
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
-from .services import NoListeners, NoTargetGroups, CertBot
-from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
 from .manager import get_alb, transfer_certificates, mark_certbots_ready
+from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate
+from .services import NoListeners, NoTargetGroups
+from .utils import POLL_TIMEOUT, NO_SERVICES_TIMEOUT, ConfigurationError
 
 logging.basicConfig(style='$')
 logger = logging.getLogger('docker-alb')
@@ -32,32 +34,31 @@ def cli_manage(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
     parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
+    parser.add_argument("--etcd-host", dest="etcd_host", default=None,
+                        help="hostname for etcd server")
+
+    command_parsers = parser.add_subparsers(dest="cmd")
+    setup_alb_cmd(command_parsers)
+    setup_certificate_cmd(command_parsers)
+
     args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
+
+    cmd = args.cmd
+
+    if cmd == "alb":
+        alb_cmd = args.alb_cmd
+        if alb_cmd == 'run':
+            cli_run_alb(args)
+    elif cmd == "certificate":
+        cert_cmd = args.cert_cmd
+        if cert_cmd == 'upload':
+            pass
+    else:
+        sys.exit(1)
 
 
-def cli_run_alb(args=None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
-    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
-    parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
-                        help="Identifier for application load balancer to setup, defaults to vhost")
-    args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
+def cli_run_alb(args):
+    verbosity = get_verbosity(args)
     alb_id = os.environ.get('ALB_ID', args.alb_id)
     if verbosity >= 1:
         logger.info("Initializing ALB with identifier: %s", alb_id)
@@ -289,4 +290,4 @@ def cli_renew_certs(args=None):
 
 
 if __name__ == "__main__":
-    cli_run_alb()
+    cli_manage()

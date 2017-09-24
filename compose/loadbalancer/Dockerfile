@@ -54,4 +54,4 @@ WORKDIR /app
 
 EXPOSE 1936 80
 
-CMD ["python3", "nap.py"]
+CMD ["python3", "nap.py", "alb", "run"]
