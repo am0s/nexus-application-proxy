@@ -50,14 +50,27 @@ def setup_alb_cmd(command_parsers: argparse._SubParsersAction):
     """
     Setup 'alb' command, contains sub-commands.
     """
-    parser = command_parsers.add_parser('alb', help='Application Load Balancer management')  # type: argparse.ArgumentParser
+    parser = command_parsers.add_parser(
+        'alb', help='Application Load Balancer management')  # type: argparse.ArgumentParser
 
     command_parsers = parser.add_subparsers(dest="alb_cmd")
     setup_alb_run_cmd(command_parsers)
+    setup_alb_show_cmd(command_parsers)
 
 
 def setup_alb_run_cmd(command_parsers: argparse._SubParsersAction):
-    parser = command_parsers.add_parser('run', help='Start an application load balancer service')  # type: argparse.ArgumentParser
+    parser = command_parsers.add_parser(
+        'run', help='Start an application load balancer service')  # type: argparse.ArgumentParser
 
     parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
                         help="Identifier for application load balancer to setup, defaults to vhost")
+
+
+def setup_alb_show_cmd(command_parsers: argparse._SubParsersAction):
+    parser = command_parsers.add_parser(
+        'run', help='Show configuration for an Application Load Balancer')  # type: argparse.ArgumentParser
+
+    parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
+                        help="Identifier for application load balancer to setup, defaults to vhost")
+    parser.add_argument("--haproxy", dest="show_haproxy", action='store_true', default=False,
+                        help="Show haproxy configuration")

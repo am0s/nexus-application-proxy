@@ -45,15 +45,23 @@ def cli_manage(args=None):
 
     cmd = args.cmd
 
-    if cmd == "alb":
-        alb_cmd = args.alb_cmd
-        if alb_cmd == 'run':
-            cli_run_alb(args)
-    elif cmd == "certificate":
-        cert_cmd = args.cert_cmd
-        if cert_cmd == 'upload':
-            pass
-    else:
+    try:
+        if cmd == "alb":
+            alb_cmd = args.alb_cmd
+            if alb_cmd == 'run':
+                cli_run_alb(args)
+            elif alb_cmd == 'show':
+                cli_show_config(args)
+        elif cmd == "certificate":
+            cert_cmd = args.cert_cmd
+            if cert_cmd == 'upload':
+                pass
+        else:
+            sys.exit(1)
+    except Exception as e:
+        verbosity = get_verbosity(args)
+        if verbosity >= 0:
+            print("Unknown error:", e, file=sys.stderr)
         sys.exit(1)
 
 
@@ -127,23 +135,8 @@ def cli_run_alb(args):
         time.sleep(POLL_TIMEOUT)
 
 
-def cli_show_config(args=None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=1)
-    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
-    parser.add_argument("--alb-identifier", dest="alb_id", default='vhost',
-                        help="Identifier for application load balancer to setup, defaults to vhost")
-    parser.add_argument("--haproxy", dest="show_haproxy", action='store_true', default=False,
-                        help="Show haproxy configuration")
-    args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
+def cli_show_config(args):
+    verbosity = get_verbosity(args)
     alb_id = os.environ.get('ALB_ID', args.alb_id)
 
     try:
