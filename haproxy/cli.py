@@ -28,6 +28,21 @@ logger.propagate = False
 logger.addHandler(debug_console)
 
 
+def cli_manage(args=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
+    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
+    args = parser.parse_args(args)
+    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
+    if verbosity is not None:
+        try:
+            verbosity = int(verbosity)
+        except ValueError:
+            verbosity = None
+    if verbosity is None:
+        verbosity = args.verbosity
+
+
 def cli_run_alb(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
