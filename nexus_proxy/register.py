@@ -409,49 +409,11 @@ def etcd_client(etcd_host=None):
     return client
 
 
-def register_vhost(args=None):
+def register_vhost(args):
     """
     Register a virtual-host in the load balancer.
     The virtual host can contain one or more domains, the primary domain should be listed first.
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", "-v", dest="verbosity", action='count', default=0)
-    parser.add_argument("--quiet", "-q", dest="verbosity", action='store_const', const=-1)
-
-    parser.add_argument("--etcd-host", dest="etcd_host", default=None,
-                        help="hostname for etcd server")
-
-    parser.add_argument("--reset", default=None,
-                        help="Resets any existing configuration before writing the new configuration")
-    parser.add_argument("--id", default=None,
-                        help="ID of target group and listener group, defaults to first domain")
-    parser.add_argument("--port", default='https',
-                        help="Which port to use for listener in load-balancer, specify a number "
-                             "or use http for HTTP only, https for https only or mixed for http and https. "
-                             "defaults to https")
-    parser.add_argument("--certificate", default=None,
-                        help="Path to certificate file (pem) to upload")
-    parser.add_argument("--certbot", action="store_true", default=False,
-                        help="Auto creation of certificate using letsencrypt")
-    parser.add_argument("--certificate-name", default=None,
-                        help="Name of certificate entry to use, default is to use ID of listener group")
-    parser.add_argument("virtual_host",
-                        help="domains to register")
-    parser.add_argument("target",
-                        help="The hostname/ip of target, either use <host>:<port> or just <host>. "
-                             "Defaults to port 80 if no port is set. Specify multiple targets with "
-                             "a comma separated list")
-
-    args = parser.parse_args(args)
-    verbosity = os.environ.get('VERBOSITY_LEVEL', None)
-    if verbosity is not None:
-        try:
-            verbosity = int(verbosity)
-        except ValueError:
-            verbosity = None
-    if verbosity is None:
-        verbosity = args.verbosity
-
     dockerhost_ip = os.environ.get("DOCKERHOST_IP")
 
     client = etcd_client(args.etcd_host)
@@ -611,14 +573,6 @@ def register_vhost(args=None):
 
     if certificate and not use_certbot:
         upload_certificate_file(client, certificate_name, certificate)
-
-
-def cli_register_vhost(args=None):
-    try:
-        register_vhost(args=args)
-    except Exception as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
 
 
 def upload_certificate(args):

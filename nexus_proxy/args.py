@@ -15,11 +15,50 @@ def process_verbosity(args):
     args.verbosity = verbosity
 
 
+def setup_listener_cmd(command_parsers: argparse._SubParsersAction):
+    """
+    Setup 'listener' command, contains sub-commands.
+    """
+    parser = command_parsers.add_parser(
+        'listener', help='Listener management')  # type: argparse.ArgumentParser
+    command_parsers = parser.add_subparsers(dest="listener_cmd")
+    setup_register_vhost_cmd(command_parsers)
+
+
+def setup_register_vhost_cmd(command_parsers: argparse._SubParsersAction):
+    """
+    Setup 'listener register-vhost' command, register virtual-host listener and optionally targets.
+    """
+    parser = command_parsers.add_parser(
+        'register-vhost', help='Register virtual-host listener')  # type: argparse.ArgumentParser
+    parser.add_argument("--reset", default=None,
+                        help="Resets any existing configuration before writing the new configuration")
+    parser.add_argument("--id", default=None,
+                        help="ID of target group and listener group, defaults to first domain")
+    parser.add_argument("--port", default='https',
+                        help="Which port to use for listener in load-balancer, specify a number "
+                             "or use http for HTTP only, https for https only or mixed for http and https. "
+                             "defaults to https")
+    parser.add_argument("--certificate", default=None,
+                        help="Path to certificate file (pem) to upload")
+    parser.add_argument("--certbot", action="store_true", default=False,
+                        help="Auto creation of certificate using letsencrypt")
+    parser.add_argument("--certificate-name", default=None,
+                        help="Name of certificate entry to use, default is to use ID of listener group")
+    parser.add_argument("virtual_host",
+                        help="domains to register")
+    parser.add_argument("target",
+                        help="The hostname/ip of target, either use <host>:<port> or just <host>. "
+                             "Defaults to port 80 if no port is set. Specify multiple targets with "
+                             "a comma separated list")
+
+
 def setup_certificate_cmd(command_parsers: argparse._SubParsersAction):
     """
     Setup 'certificate' command, contains sub-commands.
     """
-    parser = command_parsers.add_parser('certificate', help='a help')  # type: argparse.ArgumentParser
+    parser = command_parsers.add_parser(
+        'certificate', help='Certificate management')  # type: argparse.ArgumentParser
     command_parsers = parser.add_subparsers(dest="cert_cmd")
     setup_upload_certificate_cmd(command_parsers)
     setup_renew_certificate_cmd(command_parsers)
