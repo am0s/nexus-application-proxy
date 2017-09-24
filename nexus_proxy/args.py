@@ -3,7 +3,7 @@ import argparse
 import os
 
 
-def get_verbosity(args) -> int:
+def process_verbosity(args):
     verbosity = os.environ.get('VERBOSITY_LEVEL', None)
     if verbosity is not None:
         try:
@@ -12,7 +12,7 @@ def get_verbosity(args) -> int:
             verbosity = None
     if verbosity is None:
         verbosity = args.verbosity
-    return verbosity
+    args.verbosity = verbosity
 
 
 def setup_certificate_cmd(command_parsers: argparse._SubParsersAction):

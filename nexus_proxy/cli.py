@@ -12,7 +12,7 @@ from subprocess import call
 import jinja2
 
 from args import setup_alb_cmd, setup_certificate_cmd
-from .args import get_verbosity
+from .args import process_verbosity
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
 from .manager import get_alb, transfer_certificates, mark_certbots_ready
 from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate
@@ -42,6 +42,7 @@ def cli_manage(args=None):
     setup_certificate_cmd(command_parsers)
 
     args = parser.parse_args(args)
+    process_verbosity(args)
 
     cmd = args.cmd
 
@@ -59,14 +60,13 @@ def cli_manage(args=None):
         else:
             sys.exit(1)
     except Exception as e:
-        verbosity = get_verbosity(args)
-        if verbosity >= 0:
+        if args.verbosity >= 0:
             print("Unknown error:", e, file=sys.stderr)
         sys.exit(1)
 
 
 def cli_run_alb(args):
-    verbosity = get_verbosity(args)
+    verbosity = args.verbosity
     alb_id = os.environ.get('ALB_ID', args.alb_id)
     if verbosity >= 1:
         logger.info("Initializing ALB with identifier: %s", alb_id)
@@ -136,7 +136,7 @@ def cli_run_alb(args):
 
 
 def cli_show_config(args):
-    verbosity = get_verbosity(args)
+    verbosity = args.verbosity
     alb_id = os.environ.get('ALB_ID', args.alb_id)
 
     try:
