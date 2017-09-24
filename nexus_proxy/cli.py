@@ -11,8 +11,7 @@ from subprocess import call
 
 import jinja2
 
-from args import setup_alb_cmd, setup_certificate_cmd
-from .args import process_verbosity
+from .args import process_verbosity, setup_alb_cmd, setup_certificate_cmd
 from .generator import write_config, generate_config, HAPROXY_TEMPLATE
 from .manager import get_alb, transfer_certificates, mark_certbots_ready
 from .register import register_certbot, etcd_client, wait_certbot_ready, unregister_certbot, register_certificate
