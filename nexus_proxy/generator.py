@@ -4,7 +4,7 @@ from jinja2 import Environment, PackageLoader
 
 from .services import LoadBalancerConfig
 
-HAPROXY_TEMPLATE = "templates/haproxy/nexus_proxy.cfg"
+HAPROXY_TEMPLATE = "templates/haproxy/haproxy.cfg"
 DEFAULT_LOG_SIDECAR_PATH = '/sidecar/log'
 env = Environment()
 
